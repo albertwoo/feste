@@ -148,21 +148,15 @@ impl BPETokenizer {
 
         // Optimization: For large vocab sizes (>2000), train on a smaller subset
         // 200KB is sufficient to learn common patterns and trains much faster
-        let mut max_sample_size = 200_000;
-        let training_text = if num_merges > 2000 && text.len() > max_sample_size {
-            // Move forward until we hit a character boundary
-            while max_sample_size < text.len() {
-                if text.is_char_boundary(max_sample_size) {
-                    break;
-                }
-                max_sample_size += 1;
-            }
-
+        const MAX_SAMPLE_SIZE: usize = 200_000;
+        let training_text = if num_merges > 2000 && text.len() > MAX_SAMPLE_SIZE {
+           let sample_size = text.floor_char_boundary(MAX_SAMPLE_SIZE);
             println!(
-                "  Using {}KB training sample for speed (learns common patterns faster)",
-                max_sample_size / 1000
+                "  Using {}KB training sample for speed (learns common patterns faster). {}",
+                sample_size / 1000,
+                sample_size
             );
-            &text[..max_sample_size]
+            &text[..sample_size]
         } else {
             text
         };
