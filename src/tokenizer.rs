@@ -150,7 +150,7 @@ impl BPETokenizer {
         // 200KB is sufficient to learn common patterns and trains much faster
         const MAX_SAMPLE_SIZE: usize = 200_000;
         let training_text = if num_merges > 2000 && text.len() > MAX_SAMPLE_SIZE {
-           let sample_size = text.floor_char_boundary(MAX_SAMPLE_SIZE);
+            let sample_size = text.floor_char_boundary(MAX_SAMPLE_SIZE);
             println!(
                 "  Using {}KB training sample for speed (learns common patterns faster). {}",
                 sample_size / 1000,
@@ -228,6 +228,17 @@ impl BPETokenizer {
 
             // The first pair is the winner
             let (best_pair, count) = pairs[0].clone();
+
+            // If the most frequent pair only appears once, further merges do not
+            // improve compression and tend to create very long one-off tokens.
+            // Stop early to avoid pathological merge growth.
+            if count < 2 {
+                println!(
+                    "  Stopping early at merge {}: best pair frequency is smaller than 2",
+                    merge_idx + 1,
+                );
+                break;
+            }
 
             // Create new token by concatenating the pair
             let new_token = format!("{}{}", best_pair.0, best_pair.1);
