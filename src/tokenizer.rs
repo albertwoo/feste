@@ -133,6 +133,47 @@ impl BPETokenizer {
     /// assert!(tokenizer.vocab_size() > 256);
     /// ```
     pub fn train(&mut self, text: &str, vocab_size: usize) {
+        self.train_with_min_frequency(text, vocab_size, 1);
+    }
+
+    /// Train BPE on a text corpus
+    ///
+    /// Learns merge rules by iteratively finding and merging the most frequent
+    /// adjacent token pairs. This builds a vocabulary from the base 256 byte
+    /// tokens up to the target vocabulary size.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - Training corpus (typically several MB of text)
+    /// * `vocab_size` - Target vocabulary size (common values: 512, 1024, 2048, 5000)
+    /// * `min_pair_count` - Minimum frequency for a pair to be merged
+    ///
+    /// # Performance Optimization
+    ///
+    /// For large vocabularies (>2000 tokens), this method trains on a 200KB sample
+    /// of the corpus rather than the full text. This is much faster and still learns
+    /// the most common patterns effectively. The learned merges are then available
+    /// for encoding the full corpus.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use feste::BPETokenizer;
+    ///
+    /// // Train on a sample text corpus
+    /// let text = "hello world hello rust hello world";
+    /// let mut tokenizer = BPETokenizer::new(300);
+    /// tokenizer.train_with_min_frequency(&text, 300, 2);
+    ///
+    /// // Verify training worked
+    /// assert!(tokenizer.vocab_size() > 256);
+    /// ```
+    pub fn train_with_min_frequency(
+        &mut self,
+        text: &str,
+        vocab_size: usize,
+        min_pair_count: usize,
+    ) {
         // If target vocab size is 256 or less, we're already done
         if vocab_size <= 256 {
             return;
@@ -232,10 +273,11 @@ impl BPETokenizer {
             // If the most frequent pair only appears once, further merges do not
             // improve compression and tend to create very long one-off tokens.
             // Stop early to avoid pathological merge growth.
-            if count < 2 {
+            if count < min_pair_count {
                 println!(
-                    "  Stopping early at merge {}: best pair frequency is smaller than 2",
+                    "  Stopping early at merge {}: best pair frequency is smaller than {}",
                     merge_idx + 1,
+                    min_pair_count
                 );
                 break;
             }
